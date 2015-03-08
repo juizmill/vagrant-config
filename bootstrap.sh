@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-ProjectName="zf2" #Pasta do projeto
-PathPublic="public" # document root do sistema
+ProjectName=“NOME DA PASTA“ #Pasta do projeto
+PathPublic=“NOME DO DOCUMENT ROOT“ # document root do sistema
+DataBase=“NOME “DA BASE DE DADOS #Nome da base de dados
 
 #Logando como sudo SU
 sudo su
@@ -78,34 +79,14 @@ php5-pspell \
 php5-recode \
 php5-tidy \
 php5-xmlrpc \
-php5-mongo \
-php5-xsl
-
-# Instalando MariaDb
-sudo apt-get install software-properties-common -y
-sudo apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xcbcb082a1bb943db
-sudo add-apt-repository 'deb http://mirror.edatel.net.co/mariadb//repo/10.0/ubuntu trusty main'
-sudo apt-get update
-sudo apt-get install mariadb-server -y
+php5-xsl \
+mysql-server
 
 # Configurando MYSQL
 sudo sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf
 sudo mysql --password=root -u root --execute="GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 sudo service mysql restart
-
-# Instalações MongoDB
-
-# Adiciona repositório do MongoDB
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10 -y
-sudo echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' | sudo tee /etc/apt/sources.list.d/mongodb.list
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-
-# torna o mongodb acessivel a partir de qualquer lugar
-sudo sed -i "s/bind_ip = .*/#bind_ip = 127.0.0.1/" /etc/mongod.conf
-
-# Habilita Text Search
-echo "setParameter = textSearchEnabled=true" | sudo tee -a /etc/mongod.conf
+sudo mysqladmin -proot -u root CREATE $DataBase;
 
 #Criando pasta
 sudo mkdir /data
@@ -141,7 +122,6 @@ cat << EOF | sudo tee -a /etc/apache2/sites-available/$ProjectName.conf
     DocumentRoot "/vagrant/$PathPublic"
     SetEnv APPLICATION_ENV development
     SetEnv APPLICATION_PATH /vagrant/
-    ### Definicao para acesso do templumCliente
     <Directory "/vagrant/$PathPublic">
         DirectoryIndex index.php
         AllowOverride All
