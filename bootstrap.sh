@@ -2,21 +2,26 @@
 
 ProjectName=“NOME DA PASTA“ #Pasta do projeto
 PathPublic=“NOME DO DOCUMENT ROOT“ # document root do sistema
-DataBase=“NOME “DA BASE DE DADOS #Nome da base de dados
+DataBase=“NOME DA BASE DE DADOS“ #Nome da base de dados
 
 #Logando como sudo SU
 sudo su
 
 echo ">>> ADD NAMESERVER DO GOOGLE <<<"
+sudo echo > /etc/resolv.conf
 sudo echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
-echo ">>> Cria SWAP <<<"
-sudo dd if=/dev/zero of=/swapfile bs=1024 count=512k
-sudo mkswap /swapfile
-sudo swapon /swapfile
-sudo echo "/swapfile       none    swap    sw      0       0 " >> /etc/fstab
-sudo chown vagrant:vagrant /swapfile
-sudo chmod 0600 /swapfile
+# verifica se o arquivo swap nao existe
+grep -q "swapfile" /etc/fstab
+if [ $? -ne 0 ]; then
+    echo ">>> Cria SWAP <<<"
+    sudo dd if=/dev/zero of=/swapfile bs=1024 count=512k
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    sudo echo "/swapfile       none    swap    sw      0       0 " >> /etc/fstab
+    sudo chown vagrant:vagrant /swapfile
+    sudo chmod 0600 /swapfile
+fi
 
 # Timezone do sistema
 sudo cp -p /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
@@ -86,7 +91,7 @@ mysql-server
 sudo sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf
 sudo mysql --password=root -u root --execute="GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 sudo service mysql restart
-sudo mysqladmin -proot -u root CREATE $DataBase;
+sudo mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS $DataBase";
 
 #Criando pasta
 sudo mkdir /data
@@ -115,6 +120,7 @@ echo -e "\n# configuracoes personalizadas\nServerTokens ProductOnly\nServerSigna
 sudo sed -i 's/User ${APACHE_RUN_USER}/User vagrant/g' /etc/apache2/apache2.conf
 sudo sed -i 's/Group ${APACHE_RUN_GROUP}/Group vagrant/g' /etc/apache2/apache2.conf
 
+sudo echo > /etc/apache2/sites-available/$ProjectName.conf
 cat << EOF | sudo tee -a /etc/apache2/sites-available/$ProjectName.conf
  <VirtualHost *:80>
     ServerName localhost
@@ -135,6 +141,37 @@ cat << EOF | sudo tee -a /etc/apache2/sites-available/$ProjectName.conf
     CustomLog /vagrant/access.log combined
 </VirtualHost>
 EOF
+
+# PHP Config
+
+# Exiba todos os erros
+sudo sed -i "s/error_reporting = .*/error_reporting = E_ALL | E_STRICT/" /etc/php5/cli/php.ini
+sudo sed -i "s/display_errors = .*/display_errors = On/" /etc/php5/cli/php.ini
+
+# Aumenta a quantidade limite de memória
+sudo sed -i "s/memory_limit = .*/memory_limit = 512M/" /etc/php5/cli/php.ini
+
+# Aumenta o tempo máximo de execução de cada script
+sudo sed -i "s/max_execution_time = .*/max_execution_time = 120/" /etc/php5/cli/php.ini
+
+# Não expoe a versão do PHP no header da response.
+sudo sed -i "s/expose_php = .*/expose_php = Off/" /etc/php5/cli/php.ini
+
+# tempo que o servidor guarda os dados da sessão antes de enviar para o Garbage Collection
+sudo sed -i "s/session.cookie_lifetime = .*/session.cookie_lifetime = 172800/" /etc/php5/cli/php.ini # 2 dias em segundos
+
+# tempo de expiração do cookie PHPSSESIONID
+sudo sed -i "s/gc_maxlifetime = .*/gc_maxlifetime = 172800/" /etc/php5/cli/php.ini # 2 dias em segundos
+
+# TIMEZONE == O -r a baixo é pro sed aceitar ?: http://stackoverflow.com/questions/6156259/sed-expression-dont-allow-optional-grouped-string
+sudo sed -r -i "s/;date.timezone =.*/date.timezone = America\/Sao_Paulo/" /etc/php5/cli/php.ini
+
+# Habilita short open tags (<? ?>)
+sudo sed -i "s/short_open_tag = .*/short_open_tag = On/" /etc/php5/cli/php.ini
+
+# Aumenta o tamanho máximo dos uploads para 100MB
+sudo sed -i "s/post_max_size = .*/post_max_size = 100M/" /etc/php5/cli/php.ini # 2 dias em segundos
+sudo sed -i "s/upload_max_filesize = .*/upload_max_filesize = 100M/" /etc/php5/cli/php.ini # 2 dias em segundos
 
 sudo a2dissite 000-default
 sudo a2ensite $ProjectName
